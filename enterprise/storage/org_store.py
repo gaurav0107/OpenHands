@@ -28,6 +28,10 @@ from openhands.app_server.settings.settings_models import Settings
 from openhands.app_server.utils.jsonpatch_compat import deep_merge
 from openhands.app_server.utils.llm import is_openhands_model
 from openhands.app_server.utils.logger import openhands_logger as logger
+from openhands.app_server.utils.sdk_settings_compat import (
+    AgentSettingsConfig,
+    validate_agent_settings,
+)
 from openhands.sdk.settings import ConversationSettings, OpenHandsAgentSettings
 
 _ORG_SETTINGS_EXCLUDED_FIELDS = {
@@ -49,8 +53,8 @@ class OrgStore:
     """Store for managing organizations."""
 
     @staticmethod
-    def get_agent_settings_from_org(org: Org) -> OpenHandsAgentSettings:
-        return OpenHandsAgentSettings.model_validate(dict(org.agent_settings))
+    def get_agent_settings_from_org(org: Org) -> AgentSettingsConfig:
+        return validate_agent_settings(dict(org.agent_settings))
 
     @staticmethod
     def get_conversation_settings_from_org(org: Org) -> ConversationSettings:
@@ -219,9 +223,12 @@ class OrgStore:
         current_settings: dict[str, Any],
         settings_diff: dict[str, Any],
         settings_type: type[OpenHandsAgentSettings] | type[ConversationSettings],
-    ) -> OpenHandsAgentSettings | ConversationSettings:
+    ) -> AgentSettingsConfig | ConversationSettings:
         """Deep-merge a sparse settings diff and validate the merged result."""
         merged_settings = deep_merge(current_settings or {}, settings_diff)
+        # Use validate_agent_settings for discriminated union support
+        if settings_type is OpenHandsAgentSettings:
+            return validate_agent_settings(merged_settings)
         return settings_type.model_validate(merged_settings)
 
     @staticmethod
